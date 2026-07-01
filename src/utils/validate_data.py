@@ -1,18 +1,26 @@
 import great_expectations as ge
+import pandas as pd
 from typing import Tuple, List
 
 
 def validate_telco_data(df) -> Tuple[bool, List[str]]:
     """
     Comprehensive data validation for Telco Customer Churn dataset using Great Expectations.
-    
+
     This function implements critical data quality checks that must pass before model training.
     It validates data integrity, business logic constraints, and statistical properties
     that the ML model expects.
-    
+
     """
     print("🔍 Starting data validation with Great Expectations...")
-    
+
+    # TotalCharges arrives as text with blank entries for brand-new customers
+    # (tenure == 0); coerce to numeric here so range checks can run. Blank
+    # values become NaN and are skipped by GE's null-tolerant range checks.
+    df = df.copy()
+    if "TotalCharges" in df.columns:
+        df["TotalCharges"] = pd.to_numeric(df["TotalCharges"], errors="coerce")
+
     # Convert pandas DataFrame to Great Expectations Dataset
     ge_df = ge.dataset.PandasDataset(df)
     
