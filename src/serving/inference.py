@@ -33,6 +33,10 @@ import mlflow
 # In development: uses local MLflow artifacts
 # In production: uses model copied to container at build time
 MODEL_DIR = "/app/model"
+# Directory containing feature_columns.txt (and preprocessing.pkl).
+# In Docker these are flattened alongside the model into MODEL_DIR.
+# In local dev they sit one level up, as siblings of the mlflow "model" folder.
+FEATURE_DIR = MODEL_DIR
 
 try:
     # Load the trained XGBoost model in MLflow pyfunc format
@@ -50,6 +54,7 @@ except Exception as e:
             latest_model = max(local_model_paths, key=os.path.getmtime)
             model = mlflow.pyfunc.load_model(latest_model)
             MODEL_DIR = latest_model
+            FEATURE_DIR = os.path.dirname(latest_model)
             print(f"✅ Fallback: Loaded model from {latest_model}")
         else:
             raise Exception("No model found in local mlruns")
@@ -60,7 +65,7 @@ except Exception as e:
 # CRITICAL: Load the exact feature column order used during training
 # This ensures the model receives features in the expected order
 try:
-    feature_file = os.path.join(MODEL_DIR, "feature_columns.txt")
+    feature_file = os.path.join(FEATURE_DIR, "feature_columns.txt")
     with open(feature_file) as f:
         FEATURE_COLS = [ln.strip() for ln in f if ln.strip()]
     print(f"✅ Loaded {len(FEATURE_COLS)} feature columns from training")
