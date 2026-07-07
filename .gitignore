@@ -17,6 +17,13 @@ artifacts/
 data/raw/
 data/processed/
 
+# App logs (folder tracked via .gitkeep, contents ignored)
+logs/*
+!logs/.gitkeep
+
 # BUT keep our bundled serving model in the repo
 !src/serving/model/
 !src/serving/model/**
+
+# Claude created Notes
+docs/ml-bible/**

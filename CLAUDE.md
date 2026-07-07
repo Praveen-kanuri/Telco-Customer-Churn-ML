@@ -93,7 +93,7 @@ Critical pattern: Training and serving must use identical feature transformation
 
 ### CI/CD Pipeline
 - **Trigger**: Push to main branch
-- **Actions**: Build Docker image → Push to Docker Hub (`anasriad8/telco-fastapi:latest`)
+- **Actions**: Build Docker image → Push to Docker Hub (`${{ secrets.DOCKERHUB_USERNAME }}/telco-fastapi:latest`)
 - **Requirements**: `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` secrets
 - **Deployment**: Manual ECS service update (AWS Fargate + ALB)
 
@@ -115,6 +115,7 @@ Optimized hyperparameters are hardcoded in `scripts/run_pipeline.py:100-110`:
 - `mlruns/` - MLflow experiment tracking database
 - `artifacts/` - Shared preprocessing artifacts (`feature_columns.json`, `preprocessing.pkl`)
 - `src/serving/model/` - Local MLflow run copies for development
+- `logs/` - Application logs (`app.log`), written by `src/serving/inference.py`; gitignored except for `.gitkeep`
 
 ### Development Notes
 - No formal test suite exists; use manual test scripts in `scripts/test_*.py`

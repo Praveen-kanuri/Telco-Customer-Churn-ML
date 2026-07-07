@@ -25,8 +25,17 @@ Production Deployment:
 """
 
 import os
+import logging
 import pandas as pd
 import mlflow
+
+os.makedirs("logs", exist_ok=True)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s - %(message)s",
+    handlers=[logging.StreamHandler(), logging.FileHandler("logs/app.log")],
+)
+logger = logging.getLogger(__name__)
 
 # === MODEL LOADING CONFIGURATION ===
 # IMPORTANT: This path is set during Docker container build
@@ -42,9 +51,9 @@ try:
     # Load the trained XGBoost model in MLflow pyfunc format
     # This ensures compatibility regardless of the underlying ML library
     model = mlflow.pyfunc.load_model(MODEL_DIR)
-    print(f"✅ Model loaded successfully from {MODEL_DIR}")
+    logger.info(f"Model loaded successfully from {MODEL_DIR}")
 except Exception as e:
-    print(f"❌ Failed to load model from {MODEL_DIR}: {e}")
+    logger.warning(f"Failed to load model from {MODEL_DIR}: {e}")
     # Fallback for local development (OPTIONAL)
     try:
         # Try loading from local MLflow tracking
@@ -55,7 +64,7 @@ except Exception as e:
             model = mlflow.pyfunc.load_model(latest_model)
             MODEL_DIR = latest_model
             FEATURE_DIR = os.path.dirname(latest_model)
-            print(f"✅ Fallback: Loaded model from {latest_model}")
+            logger.info(f"Fallback: Loaded model from {latest_model}")
         else:
             raise Exception("No model found in local mlruns")
     except Exception as fallback_error:
@@ -68,7 +77,7 @@ try:
     feature_file = os.path.join(FEATURE_DIR, "feature_columns.txt")
     with open(feature_file) as f:
         FEATURE_COLS = [ln.strip() for ln in f if ln.strip()]
-    print(f"✅ Loaded {len(FEATURE_COLS)} feature columns from training")
+    logger.info(f"Loaded {len(FEATURE_COLS)} feature columns from training")
 except Exception as e:
     raise Exception(f"Failed to load feature columns: {e}")
 
@@ -193,36 +202,38 @@ def predict(input_dict: dict) -> str:
         "Likely to churn"
     """
     
+    logger.info(f"Prediction request received: {input_dict}")
+
     # === STEP 1: Convert Input to DataFrame ===
     # Create single-row DataFrame for pandas transformations
     df = pd.DataFrame([input_dict])
-    
+
     # === STEP 2: Apply Feature Transformations ===
     # Use the same transformation pipeline as training
     df_enc = _serve_transform(df)
-    
+
     # === STEP 3: Generate Model Prediction ===
     # Call the loaded MLflow model for inference
     # The model returns predictions in various formats depending on the ML library
     try:
         preds = model.predict(df_enc)
-        
+
         # Normalize prediction output to consistent format
         if hasattr(preds, "tolist"):
             preds = preds.tolist()  # Convert numpy array to list
-            
+
         # Extract single prediction value (for single-row input)
         if isinstance(preds, (list, tuple)) and len(preds) == 1:
             result = preds[0]
         else:
             result = preds
-            
+
     except Exception as e:
+        logger.error(f"Model prediction failed: {e}")
         raise Exception(f"Model prediction failed: {e}")
-    
+
     # === STEP 4: Convert to Business-Friendly Output ===
     # Convert binary prediction (0/1) to actionable business language
-    if result == 1:
-        return "Likely to churn"      # High risk - needs intervention
-    else:
-        return "Not likely to churn"  # Low risk - maintain normal service
+    outcome = "Likely to churn" if result == 1 else "Not likely to churn"
+    logger.info(f"Prediction result: {outcome} (raw={result})")
+    return outcome
